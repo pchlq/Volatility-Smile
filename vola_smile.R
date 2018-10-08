@@ -6,6 +6,7 @@ library(purrr)
 library(PerformanceAnalytics)
 library(quantmod)
 library(rugarch)
+library(magrittr)
 
 vola_funny.smile(tickers           = c("SPFB.Si", "SPFB.BR"),
                  dateFrom         = "2018-01-01",
@@ -14,6 +15,8 @@ vola_funny.smile(tickers           = c("SPFB.Si", "SPFB.BR"),
                  volaPeriod_smile = 2,
                  forc_period      = 5,
                  estimators       = c("yang.zhang", "close"))
+
+
 
 vola_funny.smile <- function(tickers, dateFrom, periodPerYear, volaPeriod, 
                              volaPeriod_smile, forc_period, estimators) {
@@ -32,8 +35,8 @@ vola_funny.smile <- function(tickers, dateFrom, periodPerYear, volaPeriod,
   
   # function to set names
   set_nms <- function(){
-    conf_intervals = c("Y", "L80", "Hi80", "L95", "H95") 
-    model_names = c("forc_arFima", "forc_arima", "vol.of.vol_forc_arima")
+    conf_intervals = c("Y", "L80", "H80", "L95", "H95") 
+    model_names = c("faf", "fa", "VV")
     names = paste(paste(unlist(lapply(model_names, function(x) rep(x, 5))), conf_intervals, sep = "."))
     estimators %>% lapply(., function(y) paste(names, y, sep = "_")) %>% unlist()
   }
@@ -63,7 +66,6 @@ vola_funny.smile <- function(tickers, dateFrom, periodPerYear, volaPeriod,
       
       ticker <- tckr[k]
       
-      
       arma_for_spec <- vola(ticker, n = volaPeriod_smile, N = periodPerYear, calc = "yang.zhang") %>% 
         arfima(lambda = BoxCox.lambda(.), biasadj = TRUE)
       
@@ -89,7 +91,6 @@ vola_funny.smile <- function(tickers, dateFrom, periodPerYear, volaPeriod,
       legend('topright', c('long-run forecast', 'unconditional value'), col = 1:2, lty = c(1, 1), bty = 'n')
       un <- (uncvariance(fit)*periodPerYear)^0.5
       
-      
       #set.seed(55)
       forc1 = ugarchforecast(fit, n.ahead = 25, n.sim = 10000)
       
@@ -99,12 +100,10 @@ vola_funny.smile <- function(tickers, dateFrom, periodPerYear, volaPeriod,
               main = paste('25-ahead volatility forecast (realGARCH)', ticker), col = 'orange')
       points(as.numeric(meansig)*periodPerYear^0.5, col = 'green')
       
-      
       # note that for the 1-ahead there is no uncertainty (unless we were doing this Bayes-style 
       # so that parameter uncertainty would have an impact).
       # describe(abs(returns)*252^0.5*100)
       sigmaDF_summary <- summary(t(sigmaDF[, , 1])*periodPerYear^0.5)
-      
       
       ## fit2 & plot
       fit2 = ugarchfit(spec, data = data_returns, solver = 'hybrid', realizedVol = realizedVol)
@@ -115,17 +114,16 @@ vola_funny.smile <- function(tickers, dateFrom, periodPerYear, volaPeriod,
       abline(h = 0)
       grid()
       
-      
       return(  data.frame("Predict + 25" = meansig[25]*periodPerYear^0.5, 
                           "Quantile"     = sigmaDF_summary[c(2,5),25],
                           
                           "Mean"         = vola(ticker, n = volaPeriod_smile, 
                                                 N = periodPerYear, 
                                                 calc = "yang.zhang") %>% 
-                            na.omit() %>% mean() * 100,
+                                                na.omit() %>% mean() * 100,
                           "Uncov"        = un,
                           "Kurtosis"     = kurtosis(c(ni$zy,ni$zx)),
-                          "Skewness"     = skewness(c(ni$zy,ni$zx))
+                          "Skewness"     = skewness(c(ni$zy,ni$zx) )
                           
       )) # end return
     } # end 'for' loop
