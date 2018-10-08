@@ -35,10 +35,12 @@ vola_funny.smile <- function(tickers, dateFrom, periodPerYear, volaPeriod,
   
   # function to set names
   set_nms <- function(){
-    conf_intervals = c("Y", "L80", "H80", "L95", "H95") 
+    conf_intervals =  c("Y", "L80", "H80", "L95", "H95")
     model_names = c("faf", "fa", "VV")
-    names = paste(paste(unlist(lapply(model_names, function(x) rep(x, 5))), conf_intervals, sep = "."))
-    estimators %>% lapply(., function(y) paste(names, y, sep = "_")) %>% unlist()
+    names = paste(paste(unlist(lapply(conf_intervals[1], function(x) rep(x, 2))), model_names, sep = "."))
+    substr(estimators, start = 1, stop = 2) %>% toupper() %>% 
+      lapply(., function(y) paste(names, y, sep = "_")) %>% unlist() %>% 
+      lapply(., function(w) append(w, conf_intervals[2:length(conf_intervals)])) %>% unlist()
   }
   
   # funny_vola function
