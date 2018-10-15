@@ -1,43 +1,49 @@
 library(dplyr)
 
-vola_delta <- function(tickers, TypeFlag, Sh, Time, Shares){
+vola_delta <- function(tickers, Sh, Time, Shares_call, Shares_put){
   
   tickers_toupper <- lapply(tickers, function(x) toupper(x)) %>% unlist()
   
   for (tic in seq_along(tickers_toupper)){
     
-    ticker     = tickers_toupper[tic]
+    ticker = tickers_toupper[tic]
+    
     from_smile = get(paste(ticker, 'smile', sep = '_'))
     from_X     = get(paste('X', ticker, sep = '_'))
-    IV         = from_smile[1, 3]
+    IV         = from_smile[1, 3] + seq(5, -5) * Sh
     sigma      = from_X[1,11]
-    vl         = IV + seq(5, -5) * Sh
     
-    if (TypeFlag == "c"){
-      price = from_X[5, 5]
-    } 
-    else if (TypeFlag == "p") {
-      price = from_X[5, 2]
-    }
+    price_call = from_X[5, 5]
+    price_put  = from_X[5, 2]
+    
+    get_greeks <- function(TypeFlag, S, price){
+      fOptions::GBSGreeks(Selection = "delta", 
+                          TypeFlag  = TypeFlag, 
+                          S         = S, 
+                          X         = price * 100,
+                          Time      = Time, 
+                          r         = 0, 
+                          b         = 0, 
+                          sigma     = sigma) 
+    } # end get_greeks function
+    
     
     options(scipen = 999)
     df <- data.frame(
-                      vola = vl,
-                      delta = lapply(vl, function(x) 
-                                                    fOptions::GBSGreeks(Selection = "delta", 
-                                                                        TypeFlag  = TypeFlag, 
-                                                                        S         = x, 
-                                                                        X         = price * 100,
-                                                                        Time      = Time, 
-                                                                        r         = 0, 
-                                                                        b         = 0, 
-                                                                        sigma     = sigma)) %>% 
-                                                              unlist() * Shares
-                    ) # end df
+                      vola = IV,
+                      delta_call = lapply(IV, function(x) get_greeks(TypeFlag = "c",
+                                                                     S        = x,
+                                                                     price    = price_call)) %>% 
+                                                          unlist() * Shares_call,
+                      delta_put = lapply(IV, function(x) get_greeks(TypeFlag = "p",
+                                                                    S        = x,
+                                                                    price    = price_put)) %>% 
+                                                         unlist() * Shares_put
+    ) # end df
     
-    assign(paste('delta', TypeFlag, ticker, sep = '_'), df, envir = parent.frame())
-  } # and 'for' loop
+    assign(paste('delta', ticker, sep = '_'), df, envir = parent.frame())
+  } # end 'for' loop
 } # end vola_delta function
 
 
-vola_delta(tickers = c("SPFB.Si", "SPFB.BR"), TypeFlag = 'p', Sh = 2, Time = 90/364, Shares = 700)
+vola_delta(tickers = c("SPFB.Si", "SPFB.BR"), Sh = 2, Time = 90/364, Shares_call = 700, Shares_put = 1000)
